@@ -1,0 +1,14 @@
+[package]
+name = "pngeq"
+version = "0.1.0"
+authors = ["Dennis Ranke <dennis.ranke@gmail.com>"]
+description = "Command line tool to quantize 24/32 bit PNGs to 8 bit PNGs based on the exoquant library"
+readme = "README.md"
+license = "MIT"
+keywords = ["quantization", "palette", 'png']
+repository = "https://github.com/exoticorn/pngeq"
+
+[dependencies]
+exoquant = "0.2.0"
+lodepng = "0.8.1"
+clap = "2.11.0"
