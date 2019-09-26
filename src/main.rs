@@ -5,7 +5,10 @@ extern crate exoquant;
 use clap::{Arg, App};
 use exoquant::*;
 use exoquant::optimizer::Optimizer;
+use lodepng::Bitmap;
+use lodepng::RGBA;
 use std::io::Write;
+use std::io::Read;
 use std::process::exit;
 
 fn main() {
@@ -73,16 +76,7 @@ fn main() {
     };
 
     let input_name = matches.value_of("INPUT").unwrap();
-    let img = match lodepng::decode32_file(input_name) {
-        Ok(img) => img,
-        Err(_) => {
-            writeln!(&mut std::io::stderr(),
-                     "Error: Failed to load PNG '{}'.",
-                     input_name)
-                .unwrap();
-            exit(1)
-        }
-    };
+    let img = load_img(input_name);
 
     let histogram = img.buffer.as_ref().iter().map(|c| Color::new(c.r, c.g, c.b, c.a)).collect();
 
@@ -145,4 +139,38 @@ fn main() {
             exit(1)
         }
     };
+}
+
+fn load_img(input_name: &str) -> Bitmap<RGBA<u8>> {
+    if (input_name == "-") {
+        println!("Hiyooo! Reading from Stdin!");
+        let mut buffer = Vec::new();
+        std::io::stdin().read_to_end(&mut buffer);
+        let slice = &buffer[..];
+        let img = match lodepng::decode32(slice) {
+            Ok(img) => img,
+            Err(_) => {
+                writeln!(&mut std::io::stderr(),
+                         "Error: Failed to load PNG '{}'.",
+                         input_name)
+                    .unwrap();
+                exit(1)
+            }
+        };
+
+        return img;
+    }
+    
+    let img = match lodepng::decode32_file(input_name) {
+        Ok(img) => img,
+        Err(_) => {
+            writeln!(&mut std::io::stderr(),
+                     "Error: Failed to load PNG '{}'.",
+                     input_name)
+                .unwrap();
+            exit(1)
+        }
+    };
+    
+    return img;
 }
