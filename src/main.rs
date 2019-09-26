@@ -29,8 +29,8 @@ fn main() {
             .possible_values(&["none", "ordered", "fs", "fs-checkered"])
             .help("Ditherer to use"))
         .args_from_usage("<NUM_COLORS> 'target color count for output'
-                          <INPUT> 'input truecolor png'
-                          <OUTPUT> 'output 8bit png'
+                          <INPUT> 'path to input truecolor png (use \"-\" to read file from stdin)'
+                          <OUTPUT> 'path for output 8bit png (use \"-\" to output to stdout)'
                           ")
         .after_help("K-Means optimization levels: none ('0'), optimize for smoothness ('s1' - \
                      's3'), optimize for colors ('c1' - 'c3'). Defaults depend on NUM_COLORS: > \
@@ -130,7 +130,7 @@ fn main() {
 
     let output_name = matches.value_of("OUTPUT").unwrap();
     
-    if (output_name == "-") {
+    if output_name == "-" {
         let mut encoded_file = match state.encode(&out_data, img.width, img.height){
             Ok(encoded_file) => encoded_file,
             Err(_) => {
@@ -140,7 +140,7 @@ fn main() {
                 exit(1)
             }
         };
-        let mut out = encoded_file.as_mut();
+        let out = encoded_file.as_mut();
         std::io::stdout().write_all(&out);
     } else {
         match state.encode_file(output_name, &out_data, img.width, img.height) {
@@ -157,7 +157,7 @@ fn main() {
 }
 
 fn load_img(input_name: &str) -> Bitmap<RGBA<u8>> {
-    if (input_name == "-") {
+    if input_name == "-" {
         let mut buffer = Vec::new();
         std::io::stdin().read_to_end(&mut buffer);
         let slice = &buffer[..];
