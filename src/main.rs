@@ -129,21 +129,27 @@ fn main() {
         .collect();
 
     let output_name = matches.value_of("OUTPUT").unwrap();
-    match state.encode_file(output_name, &out_data, img.width, img.height) {
-        Ok(_) => (),
-        Err(_) => {
-            writeln!(&mut std::io::stderr(),
-                     "Error: Failed to write PNG '{}'.",
-                     output_name)
-                .unwrap();
-            exit(1)
-        }
-    };
+    
+    if (output_name == "-") {
+        let mut encoded_file = state.encode(&out_data, img.width, img.height).unwrap();
+        let mut out = encoded_file.as_mut();
+        std::io::stdout().write_all(&out);
+    } else {
+        match state.encode_file(output_name, &out_data, img.width, img.height) {
+            Ok(_) => (),
+            Err(_) => {
+                writeln!(&mut std::io::stderr(),
+                         "Error: Failed to write PNG '{}'.",
+                         output_name)
+                    .unwrap();
+                exit(1)
+            }
+        };   
+    }
 }
 
 fn load_img(input_name: &str) -> Bitmap<RGBA<u8>> {
     if (input_name == "-") {
-        println!("Hiyooo! Reading from Stdin!");
         let mut buffer = Vec::new();
         std::io::stdin().read_to_end(&mut buffer);
         let slice = &buffer[..];
