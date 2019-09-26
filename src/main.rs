@@ -131,7 +131,15 @@ fn main() {
     let output_name = matches.value_of("OUTPUT").unwrap();
     
     if (output_name == "-") {
-        let mut encoded_file = state.encode(&out_data, img.width, img.height).unwrap();
+        let mut encoded_file = match state.encode(&out_data, img.width, img.height){
+            Ok(encoded_file) => encoded_file,
+            Err(_) => {
+                writeln!(&mut std::io::stderr(),
+                         "Error: Failed to write PNG to stdout")
+                    .unwrap();
+                exit(1)
+            }
+        };
         let mut out = encoded_file.as_mut();
         std::io::stdout().write_all(&out);
     } else {
