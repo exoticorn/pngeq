@@ -30,8 +30,8 @@ OPTIONS:
 
 ARGS:
     <NUM_COLORS>    target color count for output
-    <INPUT>         path to input truecolor png (use \"-\" to read file from stdin)
-    <OUTPUT>        path for output 8bit png (use \"-\" to output to stdout)
+    <INPUT>         path to input truecolor png (use "-" to read file from stdin)
+    <OUTPUT>        path for output 8bit png (use "-" to output to stdout)
 
 K-Means optimization levels: none ('0'), optimize for smoothness ('s1' - 's3'),
 optimize for colors ('c1' - 'c3'). Defaults depend on NUM_COLORS: > 128 color:
