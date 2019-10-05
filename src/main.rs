@@ -1,14 +1,14 @@
 extern crate clap;
-extern crate lodepng;
 extern crate exoquant;
+extern crate lodepng;
 
-use clap::{Arg, App};
-use exoquant::*;
+use clap::{App, Arg};
 use exoquant::optimizer::Optimizer;
+use exoquant::*;
 use lodepng::Bitmap;
 use lodepng::RGBA;
-use std::io::Write;
 use std::io::Read;
+use std::io::Write;
 use std::process::exit;
 
 fn main() {
@@ -16,46 +16,53 @@ fn main() {
         .version("0.1.0")
         .author("Dennis Ranke <dennis.ranke@gmail.com>")
         .about("Quantize 24/32bit PNG files to 8bit.")
-        .arg(Arg::with_name("optimization level")
-            .long("opt")
-            .short("O")
-            .takes_value(true)
-            .possible_values(&["0", "s1", "s2", "s3", "c1", "c2", "c3"])
-            .help("Palette optimization"))
-        .arg(Arg::with_name("ditherer")
-            .long("dither")
-            .short("d")
-            .takes_value(true)
-            .possible_values(&["none", "ordered", "fs", "fs-checkered"])
-            .help("Ditherer to use"))
-        .args_from_usage("<NUM_COLORS> 'target color count for output'
+        .arg(
+            Arg::with_name("optimization level")
+                .long("opt")
+                .short("O")
+                .takes_value(true)
+                .possible_values(&["0", "s1", "s2", "s3", "c1", "c2", "c3"])
+                .help("Palette optimization"),
+        )
+        .arg(
+            Arg::with_name("ditherer")
+                .long("dither")
+                .short("d")
+                .takes_value(true)
+                .possible_values(&["none", "ordered", "fs", "fs-checkered"])
+                .help("Ditherer to use"),
+        )
+        .args_from_usage(
+            "<NUM_COLORS> 'target color count for output'
                           <INPUT> 'path to input truecolor png (use \"-\" to read file from stdin)'
                           <OUTPUT> 'path for output 8bit png (use \"-\" to output to stdout)'
-                          ")
-        .after_help("K-Means optimization levels: none ('0'), optimize for smoothness ('s1' - \
-                     's3'), optimize for colors ('c1' - 'c3'). Defaults depend on NUM_COLORS: > \
-                     128 color: 's1', > 64 colors: 's2', >= 32 colors: 'c2', < 32 colors: 'c3'\n\
-                     Available ditherers: 'none', 'ordered', 'fs', 'fs-checkered'")
+                          ",
+        )
+        .after_help(
+            "K-Means optimization levels: none ('0'), optimize for smoothness ('s1' - \
+             's3'), optimize for colors ('c1' - 'c3'). Defaults depend on NUM_COLORS: > \
+             128 color: 's1', > 64 colors: 's2', >= 32 colors: 'c2', < 32 colors: 'c3'\n\
+             Available ditherers: 'none', 'ordered', 'fs', 'fs-checkered'",
+        )
         .get_matches();
 
-    let ditherer: Box<ditherer::Ditherer> = match matches.value_of("ditherer")
-        .unwrap_or("fs-checkered") {
-        "none" => Box::new(ditherer::None),
-        "ordered" => Box::new(ditherer::Ordered),
-        "fs" => Box::new(ditherer::FloydSteinberg::new()),
-        "fs-checkered" => Box::new(ditherer::FloydSteinberg::checkered()),
-        other => panic!("Unknown ditherer '{}'", other),
-    };
+    let ditherer: Box<dyn ditherer::Ditherer> =
+        match matches.value_of("ditherer").unwrap_or("fs-checkered") {
+            "none" => Box::new(ditherer::None),
+            "ordered" => Box::new(ditherer::Ordered),
+            "fs" => Box::new(ditherer::FloydSteinberg::new()),
+            "fs-checkered" => Box::new(ditherer::FloydSteinberg::checkered()),
+            other => panic!("Unknown ditherer '{}'", other),
+        };
     let num_colors: usize = match matches.value_of("NUM_COLORS").unwrap().parse() {
         Ok(num) if num > 0 && num <= 256 => num,
         _ => {
-            writeln!(&mut std::io::stderr(),
-                     "Error: NUM_COLORS needs to be an integer between 1-256.")
-                .unwrap();
+            eprintln!("Error: NUM_COLORS needs to be an integer between 1-256.");
             exit(1)
         }
     };
-    let (optimizer, opt_level): (Box<Optimizer>, u32) = match matches.value_of("optimization level")
+    let (optimizer, opt_level): (Box<dyn Optimizer>, u32) = match matches
+        .value_of("optimization level")
         .unwrap_or(if num_colors > 128 {
             "s1"
         } else if num_colors > 64 {
@@ -78,7 +85,12 @@ fn main() {
     let input_name = matches.value_of("INPUT").unwrap();
     let img = load_img(input_name);
 
-    let histogram = img.buffer.as_ref().iter().map(|c| Color::new(c.r, c.g, c.b, c.a)).collect();
+    let histogram = img
+        .buffer
+        .as_ref()
+        .iter()
+        .map(|c| Color::new(c.r, c.g, c.b, c.a))
+        .collect();
 
     let colorspace = SimpleColorSpace::default();
 
@@ -103,16 +115,20 @@ fn main() {
     let mut state = lodepng::State::new();
     for color in &palette {
         unsafe {
-            lodepng::ffi::lodepng_palette_add(&mut state.info_png().color,
-                                              color.r,
-                                              color.g,
-                                              color.b,
-                                              color.a);
-            lodepng::ffi::lodepng_palette_add(&mut state.info_raw(),
-                                              color.r,
-                                              color.g,
-                                              color.b,
-                                              color.a);
+            lodepng::ffi::lodepng_palette_add(
+                &mut state.info_png().color,
+                color.r,
+                color.g,
+                color.b,
+                color.a,
+            );
+            lodepng::ffi::lodepng_palette_add(
+                &mut state.info_raw(),
+                color.r,
+                color.g,
+                color.b,
+                color.a,
+            );
         }
     }
     state.info_png().color.bitdepth = 8;
@@ -121,70 +137,68 @@ fn main() {
     state.info_raw().colortype = lodepng::ColorType::LCT_PALETTE;
 
     let remapper = Remapper::new(&palette, &colorspace, &*ditherer);
-    let out_data: Vec<_> = remapper.remap_iter(Box::new(img.buffer
-                        .as_ref()
-                        .iter()
-                        .map(|c| Color::new(c.r, c.g, c.b, c.a))),
-                    img.width)
+    let out_data: Vec<_> = remapper
+        .remap_iter(
+            Box::new(
+                img.buffer
+                    .as_ref()
+                    .iter()
+                    .map(|c| Color::new(c.r, c.g, c.b, c.a)),
+            ),
+            img.width,
+        )
         .collect();
 
     let output_name = matches.value_of("OUTPUT").unwrap();
-    
+
     if output_name == "-" {
-        let mut encoded_file = match state.encode(&out_data, img.width, img.height){
+        let mut encoded_file = match state.encode(&out_data, img.width, img.height) {
             Ok(encoded_file) => encoded_file,
             Err(_) => {
-                writeln!(&mut std::io::stderr(),
-                         "Error: Failed to write PNG to stdout")
-                    .unwrap();
+                eprintln!("Error: Failed to write PNG to stdout");
                 exit(1)
             }
         };
         let out = encoded_file.as_mut();
-        std::io::stdout().write_all(&out);
+        std::io::stdout()
+            .write_all(&out)
+            .expect("Failed to write to stdout");
     } else {
         match state.encode_file(output_name, &out_data, img.width, img.height) {
             Ok(_) => (),
             Err(_) => {
-                writeln!(&mut std::io::stderr(),
-                         "Error: Failed to write PNG '{}'.",
-                         output_name)
-                    .unwrap();
+                eprintln!("Error: Failed to write PNG '{}'.", output_name);
                 exit(1)
             }
-        };   
+        };
     }
 }
 
 fn load_img(input_name: &str) -> Bitmap<RGBA<u8>> {
     if input_name == "-" {
         let mut buffer = Vec::new();
-        std::io::stdin().read_to_end(&mut buffer);
+        std::io::stdin()
+            .read_to_end(&mut buffer)
+            .expect("Failed to read from stdin");
         let slice = &buffer[..];
         let img = match lodepng::decode32(slice) {
             Ok(img) => img,
             Err(_) => {
-                writeln!(&mut std::io::stderr(),
-                         "Error: Failed to load PNG '{}'.",
-                         input_name)
-                    .unwrap();
+                eprintln!("Error: Failed to load PNG '{}'.", input_name);
                 exit(1)
             }
         };
 
         return img;
     }
-    
+
     let img = match lodepng::decode32_file(input_name) {
         Ok(img) => img,
         Err(_) => {
-            writeln!(&mut std::io::stderr(),
-                     "Error: Failed to load PNG '{}'.",
-                     input_name)
-                .unwrap();
+            eprintln!("Error: Failed to load PNG '{}'.", input_name);
             exit(1)
         }
     };
-    
+
     return img;
 }
