@@ -5,7 +5,10 @@ extern crate exoquant;
 use clap::{Arg, App};
 use exoquant::*;
 use exoquant::optimizer::Optimizer;
+use lodepng::Bitmap;
+use lodepng::RGBA;
 use std::io::Write;
+use std::io::Read;
 use std::process::exit;
 
 fn main() {
@@ -26,8 +29,8 @@ fn main() {
             .possible_values(&["none", "ordered", "fs", "fs-checkered"])
             .help("Ditherer to use"))
         .args_from_usage("<NUM_COLORS> 'target color count for output'
-                          <INPUT> 'input truecolor png'
-                          <OUTPUT> 'output 8bit png'
+                          <INPUT> 'path to input truecolor png (use \"-\" to read file from stdin)'
+                          <OUTPUT> 'path for output 8bit png (use \"-\" to output to stdout)'
                           ")
         .after_help("K-Means optimization levels: none ('0'), optimize for smoothness ('s1' - \
                      's3'), optimize for colors ('c1' - 'c3'). Defaults depend on NUM_COLORS: > \
@@ -73,16 +76,7 @@ fn main() {
     };
 
     let input_name = matches.value_of("INPUT").unwrap();
-    let img = match lodepng::decode32_file(input_name) {
-        Ok(img) => img,
-        Err(_) => {
-            writeln!(&mut std::io::stderr(),
-                     "Error: Failed to load PNG '{}'.",
-                     input_name)
-                .unwrap();
-            exit(1)
-        }
-    };
+    let img = load_img(input_name);
 
     let histogram = img.buffer.as_ref().iter().map(|c| Color::new(c.r, c.g, c.b, c.a)).collect();
 
@@ -135,14 +129,62 @@ fn main() {
         .collect();
 
     let output_name = matches.value_of("OUTPUT").unwrap();
-    match state.encode_file(output_name, &out_data, img.width, img.height) {
-        Ok(_) => (),
+    
+    if output_name == "-" {
+        let mut encoded_file = match state.encode(&out_data, img.width, img.height){
+            Ok(encoded_file) => encoded_file,
+            Err(_) => {
+                writeln!(&mut std::io::stderr(),
+                         "Error: Failed to write PNG to stdout")
+                    .unwrap();
+                exit(1)
+            }
+        };
+        let out = encoded_file.as_mut();
+        std::io::stdout().write_all(&out);
+    } else {
+        match state.encode_file(output_name, &out_data, img.width, img.height) {
+            Ok(_) => (),
+            Err(_) => {
+                writeln!(&mut std::io::stderr(),
+                         "Error: Failed to write PNG '{}'.",
+                         output_name)
+                    .unwrap();
+                exit(1)
+            }
+        };   
+    }
+}
+
+fn load_img(input_name: &str) -> Bitmap<RGBA<u8>> {
+    if input_name == "-" {
+        let mut buffer = Vec::new();
+        std::io::stdin().read_to_end(&mut buffer);
+        let slice = &buffer[..];
+        let img = match lodepng::decode32(slice) {
+            Ok(img) => img,
+            Err(_) => {
+                writeln!(&mut std::io::stderr(),
+                         "Error: Failed to load PNG '{}'.",
+                         input_name)
+                    .unwrap();
+                exit(1)
+            }
+        };
+
+        return img;
+    }
+    
+    let img = match lodepng::decode32_file(input_name) {
+        Ok(img) => img,
         Err(_) => {
             writeln!(&mut std::io::stderr(),
-                     "Error: Failed to write PNG '{}'.",
-                     output_name)
+                     "Error: Failed to load PNG '{}'.",
+                     input_name)
                 .unwrap();
             exit(1)
         }
     };
+    
+    return img;
 }
